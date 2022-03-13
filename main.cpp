@@ -33,14 +33,15 @@ int main(int argc, char **argv)
   regex rex(rx_str);
 
   // Searching for the regex in each string
-  string line;
+  string line, tmp;
   smatch m;
   vector<string> head, tail;
   int mx = 0;
   while (getline(cin, line)) {
     if (regex_search (line,m,rex)) {
+        tmp = string(m[2]); rtrim(tmp);
         head.push_back(m[1]);
-        tail.push_back(m[2]);
+        tail.push_back(tmp);
 
         if (m[1].length() > mx)
             mx = m[1].length();
@@ -50,15 +51,16 @@ int main(int argc, char **argv)
         tail.push_back("");
     }
   }
-  mx = ((mx + clmn_width) / clmn_width) * clmn_width - 1;
+  mx = ((mx + clmn_width) / clmn_width) * clmn_width;
 
 
   // Printing the lines with alignment
   auto a = head.begin(), b = tail.begin();
   for (; a != head.end() && b != tail.end(); ++a, ++b) {
     cout << *a;
-    for (int i=a->length(); i<mx; ++i)
-        cout << " ";
+    if (b->length() > 0) 
+        for (int i=a->length(); i<mx; ++i) 
+            cout << " ";
     cout << *b << "\n";
   }
 }
