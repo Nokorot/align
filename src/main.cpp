@@ -33,7 +33,7 @@ regex mk_regex(options &o, char **args) {
   // Construction the regex
   char rx_str[512];
   int rx_len = 0;
-  rx_len = sprintf(rx_str, "(.*[^ ])[ ]*(%s.*", *args);
+  rx_len = sprintf(rx_str, "(.*)[ ]*(%s.*", *args);
   while (*(++args)) {
     rx_len += sprintf(rx_str + rx_len, "|%s.*", *args);
   }
@@ -51,7 +51,6 @@ int find_key(options &o, regex rx, vector<string> &head, vector<string> &tail) {
         tmp = string(m[2]); rtrim(tmp);
         head.push_back(m[1]);
         tail.push_back(tmp);
-        printf("%d\n", m.size());
 
         if (m[1].length() > mx)
             mx = m[1].length();
