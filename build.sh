@@ -8,10 +8,11 @@ PRGNAME="align"
 debug() {
   g++ -std=c++17 -pedantic -ggdb -o $PRGNAME $SRC \
     || exit 1
+  echo "Build debug complete!"
 }
 
 release() {
-  g++ -O3 -std=c++17 $SRC
+  g++ -O3 -std=c++17 -o $PRGNAME $SRC
 }
 
 install() {
