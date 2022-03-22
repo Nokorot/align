@@ -1,6 +1,9 @@
 
- - Align on the frist case not the lAast
+- Align acording to utf8 formating
+
+# Done:
+ - align multiple times. // Currently done with c stule streams
+- '-i' for case insensitive:
  - Align after
-
+ - Align on the frist case not the last
  - '('  and ')' Does not work
-

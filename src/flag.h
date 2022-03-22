@@ -1,5 +1,6 @@
 //
 // Code from: https://github.com/tsoding/dedup
+// with some miner modifications
 //  
 // LICENSE
 //
@@ -49,16 +50,19 @@
 // etc.
 // WARNING! *_var functions may break the flag_name() functionality
 
-char *flag_name(void *val);
-bool *flag_bool(const char *name, bool def, const char *desc);
-uint64_t *flag_uint64(const char *name, uint64_t def, const char *desc);
-size_t *flag_size(const char *name, uint64_t def, const char *desc);
-char **flag_str(const char *name, const char *def, const char *desc);
-bool flag_parse(int argc, char **argv);
-int flag_rest_argc(void);
-char **flag_rest_argv(void);
-void flag_print_error(FILE *stream);
-void flag_print_options(FILE *stream);
+char       *flag_name(void *val);
+bool       *flag_bool(const char *name, bool def, const char *desc);
+uint64_t   *flag_uint64(const char *name, uint64_t def, const char *desc);
+size_t     *flag_size(const char *name, uint64_t def, const char *desc);
+char      **flag_str(const char *name, const char *def, const char *desc);
+
+bool    flag_parse(int argc, char **argv);
+int     flag_rest_argc(void);
+char  **flag_rest_argv(void);
+void    flag_print_error(FILE *stream);
+void    flag_print_options(FILE *stream);
+
+
 
 #endif // FLAG_H_
 
