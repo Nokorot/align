@@ -1,4 +1,4 @@
-    "background": "#0C0C0C",
+ "background": "#0C0C0C",
     "black": "#0C0C0C", "#%TEST"
     "blue": "#0037DA",
     "blue": "Frac",

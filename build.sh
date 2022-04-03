@@ -30,7 +30,7 @@ usage() {
     echo "Usage: $0 [subcmd]\n"
     echo ""
     echo "Subcmds:"
-    echo "    build|debug   building in debug mode"
+    echo "    build|debug   building in debug mode (Default)"
     echo "    install       building in release and intaling the executable"
     echo "    clean         deleting build files"
 }
@@ -46,6 +46,8 @@ else
       install ;;
     clean)
       clean ;;
+    -h|--help|help) 
+        usage ;;
   esac
 fi
 
