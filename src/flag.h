@@ -192,26 +192,30 @@ char **flag_rest_argv(void)
     return flag_global_context.rest_argv;
 }
 
-bool flag_parse(int argc, char **argv)
+bool flag_parse(int *argc, char **argv)
 {
+    char **new_argv = argv;
+    char new_argc = 0;
+
     Flag_Context *c = &flag_global_context;
 
-    flag_shift_args(&argc, &argv);
+    // Shift program arg first,
+    flag_shift_args(argc, &argv);
 
-    while (argc > 0) {
-        char *flag = flag_shift_args(&argc, &argv);
+
+    while (*argc > 0) {
+        char *flag = flag_shift_args(argc, &argv);
 
         if (*flag != '-') {
             // NOTE: pushing flag back into args
-            c->rest_argc = argc + 1;
-            c->rest_argv = argv - 1;
-            return true;
+            new_argv[new_argc++] = flag;
+            continue;
         }
 
         if (strcmp(flag, "--") == 0) {
             // NOTE: but if it's the terminator we don't need to push it back
-            c->rest_argc = argc;
-            c->rest_argv = argv;
+            while ( *argc > 0 )
+                new_argv[new_argc++] = flag_shift_args(argc, &argv);
             return true;
         }
 
@@ -229,23 +233,23 @@ bool flag_parse(int argc, char **argv)
                 break;
 
                 case FLAG_STR: {
-                    if (argc == 0) {
+                    if (*argc == 0) {
                         c->flag_error = FLAG_ERROR_NO_VALUE;
                         c->flag_error_name = flag;
                         return false;
                     }
-                    char *arg = flag_shift_args(&argc, &argv);
+                    char *arg = flag_shift_args(argc, &argv);
                     c->flags[i].val.as_str = arg;
                 }
                 break;
 
                 case FLAG_UINT64: {
-                    if (argc == 0) {
+                    if (*argc == 0) {
                         c->flag_error = FLAG_ERROR_NO_VALUE;
                         c->flag_error_name = flag;
                         return false;
                     }
-                    char *arg = flag_shift_args(&argc, &argv);
+                    char *arg = flag_shift_args(argc, &argv);
 
                     static_assert(sizeof(unsigned long long int) == sizeof(uint64_t), "The original author designed this for x86_64 machine with the compiler that expects unsigned long long int and uint64_t to be the same thing, so they could use strtoull() function to parse it. Please adjust this code for your case and maybe even send the patch to upstream to make it work on a wider range of environments.");
                     char *endptr;
@@ -270,12 +274,12 @@ bool flag_parse(int argc, char **argv)
                 break;
 
                 case FLAG_SIZE: {
-                    if (argc == 0) {
+                    if (*argc == 0) {
                         c->flag_error = FLAG_ERROR_NO_VALUE;
                         c->flag_error_name = flag;
                         return false;
                     }
-                    char *arg = flag_shift_args(&argc, &argv);
+                    char *arg = flag_shift_args(argc, &argv);
 
                     static_assert(sizeof(unsigned long long int) == sizeof(size_t), "The original author designed this for x86_64 machine with the compiler that expects unsigned long long int and size_t to be the same thing, so they could use strtoull() function to parse it. Please adjust this code for your case and maybe even send the patch to upstream to make it work on a wider range of environments.");
                     char *endptr;
@@ -330,8 +334,11 @@ bool flag_parse(int argc, char **argv)
         }
     }
 
-    c->rest_argc = argc;
+    c->rest_argc = *argc;
     c->rest_argv = argv;
+
+    *argc = new_argc;
+
     return true;
 }
 

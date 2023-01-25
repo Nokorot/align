@@ -63,71 +63,86 @@ int match_key(options &o, regex &rx, string line) {
   }
 }
 
-int split_lines(options &o, FILE *inpt, char *key, vector<string> &head, vector<string> &tail) {
-  regex rx = mk_regex(o, key);
+vector<int> split_lines(options &o, FILE *inpt, char **keys, 
+        vector<vector<string>> &rows) {
+  vector<regex> rxs;
+  for (; *keys; ++keys)
+    rxs.push_back(mk_regex(o, *keys));
+
+  vector<int> widths(rxs.size());
 
   string line, tmp;
   char *lineptr; size_t len=0;
   int idx, mx = 0;
+
   while (getline(&lineptr, &len, inpt) > 0) {
     line = string(lineptr);
-    if (0 < (idx = match_key(o, rx, line))) {
-        if (o.after) {
-            tmp = line.substr(idx); trim(tmp);
-            tail.push_back(tmp);
-            head.push_back(line.substr(0, idx));
-        } else {
-            tmp = line.substr(0, idx); rtrim(tmp);
-            head.push_back(tmp);
-            tmp = line.substr(idx); rtrim(tmp);
-            tail.push_back(tmp);
+    
+    int rowc = 0;
+    vector<string> row;
+    for (auto rx=rxs.begin(); rx != rxs.end(); ++rx, ++rowc) {
+        if( 0 < (idx = match_key(o, *rx, line)) ) {
+            // TODO: Test this some more
+            if (o.after) {
+                row.push_back(line.substr(0, idx)); // Don't know why there is no trimming
+                line = line.substr(idx); ltrim(line);
+            } else {
+                tmp = line.substr(0, idx); rtrim(tmp);
+                row.push_back(tmp);
+                line = line.substr(idx); rtrim(line); // Note this leaves spaces
+            }
+            
+            // Unicode ??
+            widths[row.size()-1] = max(widths[row.size()-1], (int) row.back().length());
+            while (row.size() < rowc)
+                row.push_back("");
         }
-
-        mx = max(mx, (int) head.back().length());
-        // if (head.back().length() > mx)
-        //     mx = head.back().length();
-    } else {
-        rtrim(line); // Removing trailing newline character
-        head.push_back(line);
-        tail.push_back("");
     }
+
+    rtrim(line); // Removing trailing newline character
+    row.push_back(line);
+
+    widths[row.size()-1] = max(widths[row.size()-1], (int) row.back().length());
+
+    rows.push_back(row);
   }
 
-  return ((mx + o.clmn_width) / o.clmn_width) * o.clmn_width;
+  // Align at clmn count
+  int charc = 0;
+  for (auto w = widths.begin(); w != widths.end(); ++w) {
+    *w = ((charc + *w + o.clmn_width) / o.clmn_width) * o.clmn_width - charc;
+    charc += *w;
+  }
+
+  return widths;
 }
 
-void align(options &o, FILE *sink, FILE *inpt, char **args) {
-  vector<string> head, tail;
 
-  int mx = split_lines(o, inpt, *args, head, tail);
+void align(options &o, FILE *sink, FILE *inpt, char **args) {
+  vector<vector<string>> rows;
+  vector<int> widths = split_lines(o, inpt, args, rows);
 
   char *bp;
   size_t size;
   FILE *stream = open_memstream(&bp, &size);
-
+   
   // Printing the lines with alignment
-  auto a = head.begin(), b = tail.begin();
-  for (; a != head.end() && b != tail.end(); ++a, ++b) {
-    fprintf(stream, "%s", (*a).c_str());
-    if (b->length() > 0) 
-        for (int i=a->length(); i<mx; ++i) 
+  auto row = rows.begin();
+  for (; row != rows.end(); ++row) {
+    // assert(row->lendth() < widths.size);
+
+    auto a = row->begin();
+    auto w = widths.begin();
+    fprintf(stream, "%s", a->c_str());
+    int alen = a->length();
+    for (a++; a != row->end(); ++a, ++w) {
+        for (int i=alen; i<*w; ++i) 
             fprintf(stream, " ");
-    fprintf(stream, "%s\n", (*b).c_str());
-    // Shuld probalby switch to c++ style streams
-    // cout << *a;
-    // if (b->length() > 0) 
-    //     for (int i=a->length(); i<mx; ++i) 
-    //         cout << " ";
-    // cout << *b << "\n";
+        fprintf(stream, "%s", a->c_str());
+    }
+    fprintf(stream, "\n");
   }
   fclose(stream);
-
-    // TODO: This is a cool way of handeling the arguments, but it would be nice if the searche of the second argument started after the first. Which could be done with multiple regex sub matches.
-  if (*(++args)) {
-    stream = fmemopen(bp, size, "r");
-    align(o, sink, stream, args);
-    fclose(stream);
-  } else {
-    fprintf(sink, "%s", bp);
-  }
+  
+  fprintf(sink, "%s", bp);
 }

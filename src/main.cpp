@@ -21,6 +21,7 @@ void usage(FILE *sink, const char *program)
 
 int main(int argc, char **argv)
 {
+
   char *program = *argv;
 
   bool *help        = flag_bool("help", false, "Print this help to stdout and exit with 0");
@@ -30,7 +31,10 @@ int main(int argc, char **argv)
   uint64_t *clmn    = flag_uint64("clmn", DEFAULT_CLMN, \
           "Sets the 'column width'. That is the key is aligned at a multiple of this value.");
 
-  if (!flag_parse(argc, argv)) { usage(stderr, program); flag_print_error(stderr); exit(1); }
+  // TODO: Check args for ',' before parsing. 
+  //  Then parse only the part before it. Use this to apply, -a, -l, -i to each key.
+
+  if (!flag_parse(&argc, argv)) { usage(stderr, program); flag_print_error(stderr); exit(1); }
   if (*help) { usage(stdout, program); exit(0); }
 
   options op;
@@ -39,7 +43,7 @@ int main(int argc, char **argv)
   op.after       = *after;
   op.last        = *last;
   op.ignore_case = *ignore_case;
-  argv = flag_rest_argv();
+  // argv = flag_rest_argv();
 
   if (!*argv) {
     fprintf(stderr, "ERROR: Not enough arguments\n\n");
