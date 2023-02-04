@@ -334,7 +334,8 @@ bool flag_parse(int *argc, char **argv)
         }
     }
 
-    new_argv[*argc+1] = nullptr;
+
+    new_argv[new_argc] = nullptr;
     c->rest_argv = new_argv;
     c->rest_argc = *argc = new_argc;
 

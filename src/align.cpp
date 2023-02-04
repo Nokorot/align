@@ -32,47 +32,56 @@ string string_replace(string &str, const string a, const string &b) {
   return ss.str();
 }
 
-regex mk_regex(options &o, char *key) {
+regex mk_regex(const key key) {
   // Construction the regex
   char rx_str[512];
   int rx_len = 0;
 
-  string s(key);
+  string s(key.str);
 
   s = string_replace(s, "(", "\\(");
   s = string_replace(s, ")", "\\)");
   rx_len = sprintf(rx_str, "(%s)", s.c_str());
 
-  if (o.ignore_case)
+  if (key.ignore_case)
     return regex(rx_str, std::regex_constants::icase);
   return regex(rx_str);
 }
 
-int match_key(options &o, regex &rx, string line) {
-  smatch m;
 
-  auto words_begin = sregex_iterator(line.begin(), line.end(), rx);
-  auto words_end = sregex_iterator();
 
-  if (words_begin == words_end)
-      return -1;
 
-  if (o.last) {
-    m = *words_begin;
-    for (auto i = words_begin; ++i != words_end;)
-        m = *i;
-  } else {
-    m = *words_begin;
-  }
+void match_key(const key &key, const string line, vector<int> &matches) {
+    auto words_begin = sregex_iterator(line.begin(), line.end(), key.rx);
+    auto words_end = sregex_iterator();
 
-  if (o.after) {
-    return m[0].second - line.begin();
-  } else {
-    return m[0].first - line.begin();
-  }
+    if (words_begin == words_end)
+        return;
+
+    auto get_index = [key](smatch m)
+    {
+        if (key.after) {
+          return m.position(0) + m.length(0);
+        } else {
+          return m.position(0);
+        }
+    };
+
+    if (key.match_all) {
+        for (auto i = words_begin; i != words_end; ++i) {
+            matches.push_back(get_index(*i));
+        }
+    } else if (key.last) {
+        smatch last_match = *words_begin;
+        for (auto match = words_begin; ++match != words_end;)
+            last_match = *match;
+        matches.push_back(get_index(last_match));
+    } else {
+        matches.push_back(get_index(*words_begin));
+    }
 }
 
-int compute_str_width(options &o, string &str)
+int compute_str_width(string &str, bool ignore_escape_sequenses)
 {
     std::u32string out;
     unicode::utf8::decode(str.c_str(), str.length(), out);
@@ -81,7 +90,7 @@ int compute_str_width(options &o, string &str)
 
     for (int k=0; k<out.length(); ++k) {
         // Skip escape sequences
-        if (o.ignore_escape_sequenses && out[k] == '\x1B') {
+        if (ignore_escape_sequenses && out[k] == '\x1B') {
             if (out[++k] == '[') {
                 if (out[++k] == '?') ++k;
                 while(unicode::is_number(out[k]) || out[k] == ';') ++k;
@@ -97,53 +106,79 @@ int compute_str_width(options &o, string &str)
     return width;
 }
 
+struct row_entry {
+    string str;
+    int current_width;
+};
 
-vector<int> split_lines(options &o, FILE *inpt, char **keys,
-        vector<vector<string>> &rows)
-{
-  vector<regex> rxs;
-  for (; *keys; ++keys)
-    rxs.push_back(mk_regex(o, *keys));
+// returns the row count
+int split_line(string line, const vector<key> &keys, vector<row_entry> &row,
+        vector<int> &widths) {
+    int i, rowc = 0;
 
-  vector<int> widths(rxs.size());
+    // TODO: u3string here
 
-  string line, tmp;
-  char *lineptr; size_t len=0;
-  int idx, mx = 0;
+    for (auto key=keys.begin(); key != keys.end(); ++key) {
+        vector<int> matches;
+        match_key(*key, line, matches);
+        for (auto index = matches.begin(); index != matches.end(); ++index, ++rowc) {
+            row_entry entry;
 
-  while (getline(&lineptr, &len, inpt) > 0) {
-    line = string(lineptr);
+            entry.str = line.substr(0, *index);
+            line = line.substr(*index);
 
-    int rowc = 0;
-    // TODO: u32 string here
-    vector<string> row;
-    // TODO: This shuld make columns. ie the second rx only efects text after the first
-    for (auto rx=rxs.begin(); rx != rxs.end(); ++rx, ++rowc) {
-        if( 0 < (idx = match_key(o, *rx, line)) ) {
-            if (o.after) {
-                row.push_back(line.substr(0, idx));
-                line = line.substr(idx);
-                line = ltrim(line, o.ignore_escape_sequenses);
-            } else {
-                tmp = line.substr(0, idx);
-                tmp = rtrim(tmp, o.ignore_escape_sequenses);
-                row.push_back(tmp);
-                line = line.substr(idx);
-                line = rtrim(line, o.ignore_escape_sequenses);
-            }
+            if (key->after)
+                line = ltrim(line, key->ignore_escape_sequenses);
+            else
+                entry.str = rtrim(entry.str, key->ignore_escape_sequenses);
 
-            int width = compute_str_width(o, row.back());
+            entry.current_width = compute_str_width(entry.str, key->ignore_escape_sequenses);
+            if (widths.size() <= rowc)
+                widths.push_back(entry.current_width);
+            else
+                widths[rowc] = max(widths[rowc], entry.current_width);
 
-            widths[row.size()-1] = max(widths[row.size()-1], width);
-            while (row.size() < rowc)
-                row.push_back("");
+            row.push_back(entry);
+            ++rowc;
         }
     }
 
-    line = rtrim(line, o.ignore_escape_sequenses);
-    row.push_back(line);
-    widths[row.size()-1] = max(widths[row.size()-1], (int) row.back().length());
-    rows.push_back(row);
+    if (line.length() > 0) {
+        // TODO: This 'ignore_escape_sequenses should probably be the one from the last key.
+        row_entry entry;
+        entry.str = rtrim(line, true);
+        entry.current_width = compute_str_width(entry.str, true);
+        if (widths.size() <= rowc)
+            widths.push_back(entry.current_width);
+        else
+            widths[rowc] = max(widths[rowc], entry.current_width);
+
+        row.push_back(entry);
+    }
+
+    return rowc+1;
+}
+
+// Returns the maximum row widths
+vector<int> split_lines(options &o, FILE *inpt, vector<key> keys,
+        vector<vector<row_entry>> &rows)
+{
+  vector<int> widths;
+
+  string line, tmp;
+  char *lineptr; size_t len=0;
+  int max_row_count = 0;
+
+  for (auto key=keys.begin(); key != keys.end(); ++key)
+      (*key).rx = mk_regex(*key);
+
+  while (getline(&lineptr, &len, inpt) > 0) {
+      line = string(lineptr);
+      vector<row_entry> row;
+      int rowc = split_line(line, keys, row, widths);
+      max_row_count = max(max_row_count, rowc);
+
+      rows.push_back(row);
   }
 
   // Align at clmn count
@@ -156,9 +191,9 @@ vector<int> split_lines(options &o, FILE *inpt, char **keys,
   return widths;
 }
 
-void align(options &o, FILE *sink, FILE *inpt, char **args) {
-  vector<vector<string>> rows;
-  vector<int> widths = split_lines(o, inpt, args, rows);
+void align(options &o, FILE *sink, FILE *inpt, vector<key> keys) {
+  vector<vector<row_entry>> rows;
+  vector<int> widths = split_lines(o, inpt, keys, rows);
 
   char *bp;
   size_t size;
@@ -170,13 +205,13 @@ void align(options &o, FILE *sink, FILE *inpt, char **args) {
     auto a = row->begin();
     auto w = widths.begin();
 
-    int a_width = compute_str_width(o, *a);
+    // int a_width = compute_str_width(*a, );
 
-    fprintf(stream, "%s", a->c_str());
-    for (a++; a != row->end(); ++a, ++w) {
-        for (int i=a_width; i<*w; ++i)
+    fprintf(stream, "%s", a->str.c_str(), a->current_width, *w);
+    for (; a + 1 != row->end(); ++w) {
+        for (int i=a->current_width; i<*w; ++i)
             fprintf(stream, " ");
-        fprintf(stream, "%s", a->c_str());
+        fprintf(stream, "%s", (++a)->str.c_str());
     }
     fprintf(stream, "\n");
   }

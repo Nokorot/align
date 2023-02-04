@@ -51,7 +51,7 @@ static inline std::string rtrim(std::string &str, bool ignore_escape_sequenses) 
     head = ch = str.c_str();
     new_str = new_str_ch = new char[str.length() + 1];
 
-    last_non_space = ch;
+    last_non_space = ch-1;
     while (*ch) {
         if (ignore_escape_sequenses && *ch == '\x1B')
             escapecode(&(++ch));
@@ -70,11 +70,12 @@ static inline std::string rtrim(std::string &str, bool ignore_escape_sequenses) 
         else if (std::isspace(*ch))
             ++ch;
         else {
-            fprintf(stderr, "ERROR: %s!\n", "Unreachable");
+            fprintf(stderr, "ERROR: Unreachable! %s", str.c_str());
             break;
         }
     }
 
+    *new_str_ch = '\0';
     return std::string(new_str);
     // s.erase(std::find_if(s.rbegin(), s.rend(), [](unsigned char ch) {
     //     return !std::isspace(ch);

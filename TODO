@@ -1,15 +1,14 @@
 
-
 - Environment variables for colmn with, maybe
-- Multiple times, second case nessesaraly after the first. // Currently done with c stule streams
 
 
 # Done:
-- align multiple times. // Currently done with c stule streams
-- '-i' for case insensitive:
+- align multiple times
+- '-i' for case insensitive
 - Align after
 - Align on the frist case not the last
 - '('  and ')' Does not work
-- Escape code freindly ltrim and rtrim.
+- Escape code freindly ltrim and rtrim
 - Align acording to utf-8 formating
 - command line opts, to desable escape code
+- Multiple times, second case nessesaraly after the first

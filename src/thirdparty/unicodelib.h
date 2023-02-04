@@ -33945,20 +33945,6 @@ inline bool compatibility_caseless_match(
              special_case_for_uppercase_I_and_dotted_uppercase_I));
 }
 
-#if 0 // TODO
-inline bool identifier_caseless_match(
-    const char32_t *s1, size_t l1, const char32_t *s2, size_t l2,
-    bool special_case_for_uppercase_I_and_dotted_uppercase_I) {
-  // D147 A string X is an identifier caseless match for a string Y if and
-  // only if toNFKC_Casefold(NFD(X)) = toNFKC_Casefold(NFD(Y))
-  return to_nfkc_case_fold(
-             to_nfd(s1, l1),
-             special_case_for_uppercase_I_and_dotted_uppercase_I) ==
-         to_nfkc_case_fold(to_nfd(s2, l2),
-                           special_case_for_uppercase_I_and_dotted_uppercase_I);
-}
-#endif
-
 //-----------------------------------------------------------------------------
 // Combining Character Sequence
 //-----------------------------------------------------------------------------
