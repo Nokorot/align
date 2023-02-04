@@ -5,6 +5,8 @@ set -e
 SRC="$(find src -type f \( -name '*.cpp' -o -name "*.c" \))"
 PRGNAME="align"
 
+echo $SRC
+
 debug() {
   g++ -std=c++17 -pedantic -ggdb -o $PRGNAME $SRC \
     || exit 1

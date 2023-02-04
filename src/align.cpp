@@ -6,6 +6,15 @@
 
 #include "str_trim.hpp"
 
+
+// #include <wchar.h>
+#include <uniwidth.h>
+
+#include <cstdlib>
+#include "thirdparty/unicodelib_encodings.h"
+#include "thirdparty/unicodelib.h"
+
+
 using namespace std;
 
 
@@ -15,7 +24,7 @@ string string_replace(string &str, const string a, const string &b) {
   size_t prev = 0, pos = str.find(a, 0);
   while(pos != string::npos) {
       ss << str.substr(prev, pos);
-      ss << b; 
+      ss << b;
       prev = pos + a.length();
       pos = str.find(a,pos+1);
   }
@@ -45,7 +54,7 @@ int match_key(options &o, regex &rx, string line) {
   auto words_begin = sregex_iterator(line.begin(), line.end(), rx);
   auto words_end = sregex_iterator();
 
-  if (words_begin == words_end) 
+  if (words_begin == words_end)
       return -1;
 
   if (o.last) {
@@ -57,14 +66,41 @@ int match_key(options &o, regex &rx, string line) {
   }
 
   if (o.after) {
-    return m[0].second - line.begin(); 
+    return m[0].second - line.begin();
   } else {
     return m[0].first - line.begin();
   }
 }
 
-vector<int> split_lines(options &o, FILE *inpt, char **keys, 
-        vector<vector<string>> &rows) {
+int compute_str_width(options &o, string &str)
+{
+    std::u32string out;
+    unicode::utf8::decode(str.c_str(), str.length(), out);
+
+    int width = 0;
+
+    for (int k=0; k<out.length(); ++k) {
+        // Skip escape sequences
+        if (o.ignore_escape_sequenses && out[k] == '\x1B') {
+            if (out[++k] == '[') {
+                if (out[++k] == '?') ++k;
+                while(unicode::is_number(out[k]) || out[k] == ';') ++k;
+            }
+            continue;
+        }
+        ++width;
+
+        // Consider emojis to have width 2.
+        if (0x1f600 < out[k] && out[k] < 0x1fffe)
+            ++width;
+    }
+    return width;
+}
+
+
+vector<int> split_lines(options &o, FILE *inpt, char **keys,
+        vector<vector<string>> &rows)
+{
   vector<regex> rxs;
   for (; *keys; ++keys)
     rxs.push_back(mk_regex(o, *keys));
@@ -77,33 +113,36 @@ vector<int> split_lines(options &o, FILE *inpt, char **keys,
 
   while (getline(&lineptr, &len, inpt) > 0) {
     line = string(lineptr);
-    
+
     int rowc = 0;
+    // TODO: u32 string here
     vector<string> row;
+    // TODO: This shuld make columns. ie the second rx only efects text after the first
     for (auto rx=rxs.begin(); rx != rxs.end(); ++rx, ++rowc) {
         if( 0 < (idx = match_key(o, *rx, line)) ) {
-            // TODO: Test this some more
             if (o.after) {
-                row.push_back(line.substr(0, idx)); // Don't know why there is no trimming
-                line = line.substr(idx); ltrim(line);
+                row.push_back(line.substr(0, idx));
+                line = line.substr(idx);
+                line = ltrim(line, o.ignore_escape_sequenses);
             } else {
-                tmp = line.substr(0, idx); rtrim(tmp);
+                tmp = line.substr(0, idx);
+                tmp = rtrim(tmp, o.ignore_escape_sequenses);
                 row.push_back(tmp);
-                line = line.substr(idx); rtrim(line); // Note this leaves spaces
+                line = line.substr(idx);
+                line = rtrim(line, o.ignore_escape_sequenses);
             }
-            
-            // Unicode ??
-            widths[row.size()-1] = max(widths[row.size()-1], (int) row.back().length());
+
+            int width = compute_str_width(o, row.back());
+
+            widths[row.size()-1] = max(widths[row.size()-1], width);
             while (row.size() < rowc)
                 row.push_back("");
         }
     }
 
-    rtrim(line); // Removing trailing newline character
+    line = rtrim(line, o.ignore_escape_sequenses);
     row.push_back(line);
-
     widths[row.size()-1] = max(widths[row.size()-1], (int) row.back().length());
-
     rows.push_back(row);
   }
 
@@ -117,7 +156,6 @@ vector<int> split_lines(options &o, FILE *inpt, char **keys,
   return widths;
 }
 
-
 void align(options &o, FILE *sink, FILE *inpt, char **args) {
   vector<vector<string>> rows;
   vector<int> widths = split_lines(o, inpt, args, rows);
@@ -125,24 +163,24 @@ void align(options &o, FILE *sink, FILE *inpt, char **args) {
   char *bp;
   size_t size;
   FILE *stream = open_memstream(&bp, &size);
-   
+
   // Printing the lines with alignment
   auto row = rows.begin();
   for (; row != rows.end(); ++row) {
-    // assert(row->lendth() < widths.size);
-
     auto a = row->begin();
     auto w = widths.begin();
+
+    int a_width = compute_str_width(o, *a);
+
     fprintf(stream, "%s", a->c_str());
-    int alen = a->length();
     for (a++; a != row->end(); ++a, ++w) {
-        for (int i=alen; i<*w; ++i) 
+        for (int i=a_width; i<*w; ++i)
             fprintf(stream, " ");
         fprintf(stream, "%s", a->c_str());
     }
     fprintf(stream, "\n");
   }
   fclose(stream);
-  
+
   fprintf(sink, "%s", bp);
 }
